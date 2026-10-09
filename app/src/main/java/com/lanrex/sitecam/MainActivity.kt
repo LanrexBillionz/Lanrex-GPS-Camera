@@ -47,6 +47,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val container = appContainer
+        lifecycleScope.launch {
+            // Back from the camera: stamp everything it saved since Open Camera was tapped.
+            val added = container.cameraSessionManager.onReturn()
+            if (added > 0) {
+                val what = if (added == 1) "1 new photo or video" else "$added new photos and videos"
+                Toast.makeText(this@MainActivity, "Found $what from the camera. Stamping now.", Toast.LENGTH_LONG).show()
+            }
+            container.siteModeController.ensureRunning()
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

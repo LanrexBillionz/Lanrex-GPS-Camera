@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lanrex.sitecam.AppContainer
 import com.lanrex.sitecam.core.format.CoordinateFormat
+import com.lanrex.sitecam.data.SiteModeState
+import com.lanrex.sitecam.data.db.ItemStatus
 import com.lanrex.sitecam.data.db.StampItem
 import com.lanrex.sitecam.location.AddressLookup
 import com.lanrex.sitecam.location.GpsFix
 import com.lanrex.sitecam.stamp.StampProgress
 import com.lanrex.sitecam.ui.permissions.AppPermissions
 import com.lanrex.sitecam.ui.permissions.PermissionSnapshot
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +26,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Address preview shown under the live coordinates. */
 sealed interface AddressUi {
@@ -48,6 +53,63 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     fun refresh() {
         _permissions.value = AppPermissions.snapshot(app)
         _locationEnabled.value = locationRepository.isLocationEnabled()
+        checkLatestPhoto()
+    }
+
+    // ---- Site Mode ---------------------------------------------------------------------------
+
+    val siteMode: StateFlow<SiteModeState> = container.settingsRepository.siteMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SiteModeState(false, 0L))
+
+    val siteModeStamped: StateFlow<Int> = siteMode
+        .flatMapLatest { state ->
+            if (state.enabled) container.stampRepository.siteModeDoneSince(state.sinceMillis) else flowOf(0)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun setSiteMode(enabled: Boolean) {
+        viewModelScope.launch { container.siteModeController.setEnabled(enabled) }
+    }
+
+    // ---- Open Camera -----------------------------------------------------------------------
+
+    /** Records the session (time + current fix) right before the camera opens. */
+    fun beginCameraSession() {
+        container.cameraSessionManager.begin(fix.value)
+    }
+
+    // ---- "Location tags are off" warning ------------------------------------------------------
+
+    private val _latestPhotoWarning = MutableStateFlow<String?>(null)
+    val latestPhotoWarning: StateFlow<String?> = _latestPhotoWarning.asStateFlow()
+    private var checkedPhotoKey: String? = null
+
+    /** Warns when the newest camera photo has no GPS (Samsung Camera's Location tags are off). */
+    private fun checkLatestPhoto() {
+        val snapshot = _permissions.value
+        if (!snapshot.mediaAny || !snapshot.mediaLocation) {
+            _latestPhotoWarning.value = null
+            return
+        }
+        viewModelScope.launch {
+            _latestPhotoWarning.value = withContext(Dispatchers.IO) {
+                val latest = container.mediaStoreRepository.latestCameraPhoto() ?: return@withContext null
+                val ageMillis = System.currentTimeMillis() - latest.dateAddedSeconds * 1000
+                if (ageMillis > 3L * 24 * 3600 * 1000) return@withContext null
+                val key = "${latest.sourceKey}:${latest.dateModifiedSeconds}"
+                if (key == checkedPhotoKey) return@withContext _latestPhotoWarning.value
+                checkedPhotoKey = key
+                val info = try {
+                    container.metadataReader.readPhoto(
+                        container.mediaStoreRepository.originalUri(latest.uri),
+                        latest.dateTakenMillis,
+                    )
+                } catch (e: Exception) {
+                    return@withContext null
+                }
+                if (info.hasLocation) null else latest.displayName
+            }
+        }
     }
 
     /** Latest live fix (high accuracy, never older than 30 s when received). */
@@ -70,7 +132,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     val needsLocationCount: StateFlow<Int> = container.stampRepository.needsLocation.map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    val problemCount: StateFlow<Int> = container.stampRepository.problems.map { list -> list.count { it.message != null } }
+    val problemCount: StateFlow<Int> = container.stampRepository.problems.map { list -> list.count { it.status == ItemStatus.FAILED } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     val progress: StateFlow<StampProgress?> = container.stampProcessor.progress

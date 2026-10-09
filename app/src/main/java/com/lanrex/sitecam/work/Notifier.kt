@@ -113,6 +113,9 @@ class Notifier(private val context: Context) {
         NotificationManagerCompat.from(context).cancel(id)
     }
 
+    /** Posts (or updates) a notification built elsewhere, e.g. the Site Mode one. */
+    fun postRaw(id: Int, notification: Notification) = post(id, notification)
+
     private fun post(id: Int, notification: Notification) {
         if (Build.VERSION.SDK_INT >= 33 && !AppPermissions.granted(context, Manifest.permission.POST_NOTIFICATIONS)) return
         try {

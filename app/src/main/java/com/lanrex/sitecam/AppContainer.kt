@@ -1,16 +1,20 @@
 package com.lanrex.sitecam
 
 import android.app.Application
+import com.lanrex.sitecam.camera.CameraSessionManager
 import com.lanrex.sitecam.data.SettingsRepository
 import com.lanrex.sitecam.data.StampRepository
 import com.lanrex.sitecam.data.db.AppDatabase
 import com.lanrex.sitecam.data.db.RoomAddressCacheStore
 import com.lanrex.sitecam.location.AddressRepository
+import com.lanrex.sitecam.location.HeadingRecorder
 import com.lanrex.sitecam.location.LocationRepository
+import com.lanrex.sitecam.media.CameraFolderScanner
 import com.lanrex.sitecam.media.MediaMetadataReader
 import com.lanrex.sitecam.media.MediaStoreRepository
 import com.lanrex.sitecam.media.MediaWriter
 import com.lanrex.sitecam.media.SharedMediaImporter
+import com.lanrex.sitecam.service.SiteModeController
 import com.lanrex.sitecam.stamp.MapTileProvider
 import com.lanrex.sitecam.stamp.PhotoStamper
 import com.lanrex.sitecam.stamp.StampProcessor
@@ -34,6 +38,7 @@ class AppContainer(val app: Application) {
     val workScheduler = WorkScheduler(app)
 
     val locationRepository = LocationRepository(app)
+    val headingRecorder = HeadingRecorder(app)
     val addressRepository: AddressRepository by lazy {
         AddressRepository(app, RoomAddressCacheStore(database.addressCache()))
     }
@@ -58,7 +63,20 @@ class AppContainer(val app: Application) {
             photoStamper = photoStamper,
             mediaWriter = mediaWriter,
             notifier = notifier,
+            heading = headingRecorder,
         )
+    }
+
+    val cameraFolderScanner: CameraFolderScanner by lazy {
+        CameraFolderScanner(app, mediaStoreRepository, stampRepository, headingRecorder)
+    }
+
+    val cameraSessionManager: CameraSessionManager by lazy {
+        CameraSessionManager(app, settingsRepository, cameraFolderScanner, workScheduler, headingRecorder, appScope)
+    }
+
+    val siteModeController: SiteModeController by lazy {
+        SiteModeController(app, settingsRepository, workScheduler) { stampProcessor.hasWork() }
     }
 
     val sharedMediaImporter: SharedMediaImporter by lazy {

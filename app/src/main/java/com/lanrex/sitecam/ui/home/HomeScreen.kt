@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsNotFixed
 import androidx.compose.material.icons.filled.LocationOff
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,12 +47,15 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -94,6 +99,10 @@ fun HomeScreen(
     val needsLocation by viewModel.needsLocationCount.collectAsStateWithLifecycle()
     val problems by viewModel.problemCount.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val siteMode by viewModel.siteMode.collectAsStateWithLifecycle()
+    val siteModeStamped by viewModel.siteModeStamped.collectAsStateWithLifecycle()
+    val latestPhotoWarning by viewModel.latestPhotoWarning.collectAsStateWithLifecycle()
+    var askBattery by remember { mutableStateOf(false) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
@@ -134,6 +143,7 @@ fun HomeScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
+                            viewModel.beginCameraSession()
                             if (!CameraLauncher.open(context)) {
                                 Toast.makeText(context, "No camera app found", Toast.LENGTH_LONG).show()
                             }
@@ -152,6 +162,23 @@ fun HomeScreen(
                     }
                 }
             }
+            item {
+                SiteModeCard(
+                    enabled = siteMode.enabled,
+                    sinceMillis = siteMode.sinceMillis,
+                    stamped = siteModeStamped,
+                    batteryUnrestricted = permissions.batteryUnrestricted,
+                    canWatch = permissions.mediaFull,
+                    onToggle = { on ->
+                        if (on && !permissions.batteryUnrestricted) askBattery = true
+                        viewModel.setSiteMode(on)
+                    },
+                    onFixBattery = { AppPermissions.requestBatteryUnrestricted(context) },
+                )
+            }
+            latestPhotoWarning?.let { name ->
+                item { LocationTagsWarning(name) }
+            }
             if (activeCount > 0) {
                 item { StampingCard(activeCount, progress, onOpenQueue) }
             }
@@ -163,6 +190,98 @@ fun HomeScreen(
                     Text("Recent stamped copies", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 items(recent, key = { it.id }) { item -> RecentItemRow(item) }
+            }
+        }
+    }
+    if (askBattery) {
+        AlertDialog(
+            onDismissRequest = { askBattery = false },
+            title = { Text("Keep Site Mode running") },
+            text = {
+                Text(
+                    "Samsung puts apps to sleep to save battery. Set SiteCam's battery usage to " +
+                        "\"Unrestricted\" so Site Mode keeps stamping new photos in the background.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    askBattery = false
+                    AppPermissions.requestBatteryUnrestricted(context)
+                }) { Text("Set Unrestricted") }
+            },
+            dismissButton = { TextButton(onClick = { askBattery = false }) { Text("Not now") } },
+        )
+    }
+}
+
+@Composable
+private fun SiteModeCard(
+    enabled: Boolean,
+    sinceMillis: Long,
+    stamped: Int,
+    batteryUnrestricted: Boolean,
+    canWatch: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onFixBattery: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Construction, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Site Mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Stamps every new camera photo and video automatically, even when you open the camera " +
+                            "from the side key or the lock screen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = enabled, onCheckedChange = onToggle, enabled = canWatch || enabled)
+            }
+            if (!canWatch && !enabled) {
+                Text("Allow access to all photos and videos above to use Site Mode.", style = MaterialTheme.typography.bodySmall)
+            }
+            if (enabled) {
+                val since = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(sinceMillis))
+                Text(
+                    "On since $since · $stamped stamped",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                if (!batteryUnrestricted) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Battery usage is not Unrestricted, so Samsung may pause Site Mode.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = onFixBattery) { Text("Fix") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationTagsWarning(fileName: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+            Icon(Icons.Filled.LocationOff, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Your latest camera photo has no location", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "$fileName was saved without GPS, which means Location tags are off in Samsung Camera. " +
+                        "Open Camera → Settings (gear icon) → turn on \"Location tags\".",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

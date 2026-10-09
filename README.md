@@ -43,6 +43,19 @@ SiteCam explains each permission in plain English before Android asks:
 Also check that **Samsung Camera → Settings → Location tags** is **on**, so every photo has its GPS
 position saved inside it.
 
+## Using SiteCam
+
+- **Open Camera**: tap it, take photos and videos in Samsung Camera as usual, then come back to
+  SiteCam (Back button or the recent-apps button). Everything saved since you tapped is stamped
+  automatically. SiteCam also notes your GPS position and which way the camera faced.
+- **Site Mode**: switch it on at the start of the day. Every new photo or video saved by the camera is
+  stamped in the background, however you open the camera (side key, lock screen, ...). A small
+  notification shows while it is on, with a **Turn off Site Mode** button. Set battery usage to
+  **Unrestricted** when asked, or Samsung may pause it.
+- **Older photos**: tap **Gallery** and pick them, or select them in Samsung Gallery and **Share → SiteCam**.
+- Stamped copies are saved in **Pictures/SiteCam** as `name_stamped.jpg`. The original stays as it was.
+- Video stamping arrives with stage 4 below; until then videos wait in the list with a note.
+
 ## How the app is built
 
 The app is written in Kotlin with Jetpack Compose. Every push to any branch runs the GitHub Actions
@@ -57,6 +70,6 @@ repository's own Releases page.
 ## Build stages
 
 1. ✅ Project, GitHub build, home screen with live location
-2. Stamping engine and gallery stamping
-3. Open Camera, auto-detect and Site Mode
+2. ✅ Stamping engine and gallery stamping
+3. ✅ Open Camera, auto-detect and Site Mode
 4. Offline handling and video stamping

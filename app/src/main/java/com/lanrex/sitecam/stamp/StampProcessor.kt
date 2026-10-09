@@ -14,6 +14,7 @@ import com.lanrex.sitecam.data.db.StampItemDao
 import com.lanrex.sitecam.data.db.hasChosenLocation
 import com.lanrex.sitecam.location.AddressLookup
 import com.lanrex.sitecam.location.AddressRepository
+import com.lanrex.sitecam.location.HeadingRecorder
 import com.lanrex.sitecam.media.MediaMetadataReader
 import com.lanrex.sitecam.media.MediaStoreRepository
 import com.lanrex.sitecam.media.MediaTypes
@@ -75,6 +76,7 @@ class StampProcessor(
     private val photoStamper: PhotoStamper,
     private val mediaWriter: MediaWriter,
     private val notifier: Notifier,
+    private val heading: HeadingRecorder? = null,
     private val videoStamper: VideoStamping? = null,
 ) {
     private val mutex = Mutex()
@@ -85,13 +87,15 @@ class StampProcessor(
     suspend fun hasWork(): Boolean = dao.unfinishedCount() > 0
 
     /**
-     * Stamps everything that is queued. Returns at once if another caller is
-     * already working through the queue (that caller will pick up new items).
+     * Stamps everything that is queued. If another caller (the Site Mode service
+     * or a WorkManager job) is already working through the queue, waits for it
+     * and then stamps whatever is left, so nothing is stranded if that caller
+     * gets stopped part-way.
      */
     suspend fun drain(): Int {
         var done = 0
         while (true) {
-            if (!mutex.tryLock()) return done
+            mutex.lock()
             try {
                 dao.requeueInterrupted(System.currentTimeMillis())
                 while (currentCoroutineContext().isActive) {
@@ -194,7 +198,9 @@ class StampProcessor(
         val time = info.captureTime ?: item.dateTakenMillis?.let { fromMillis(it) } ?: StampContent.now()
         val prepared = prepare(stampSettings, location)
         val lines = StampContent.lines(stampSettings, prepared.address, location.latitude, location.longitude, time)
-        val heading = item.headingDegrees ?: info.headingDegrees
+        // The camera's own compass value (EXIF) wins over SiteCam's recording.
+        val facing = info.headingDegrees ?: item.headingDegrees
+        heading?.lastKnownPosition = location.latitude to location.longitude
 
         val tmp = File(context.cacheDir, "stamping/item_${item.id}.jpg")
         tmp.parentFile?.mkdirs()
@@ -203,7 +209,7 @@ class StampProcessor(
             withContext(Dispatchers.Default) {
                 val job = currentCoroutineContext()
                 photoStamper.stamp(
-                    PhotoStamper.Request(readable, info, lines, stampSettings.showMap, prepared.map?.tile, heading),
+                    PhotoStamper.Request(readable, info, lines, stampSettings.showMap, prepared.map?.tile, facing),
                     tmp,
                     isCancelled = { !job.isActive },
                     onProgress = { onProgress(it * 0.9f) },

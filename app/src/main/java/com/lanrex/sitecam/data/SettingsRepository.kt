@@ -123,9 +123,11 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
-    /** A fix that arrived shortly after Open Camera was tapped. */
-    suspend fun recordSessionFix(fix: GpsFix) {
-        context.settingsStore.edit { it.writeFix(fix) }
+    /** A fix that arrived shortly after Open Camera was tapped (only for that same session). */
+    suspend fun recordSessionFix(fix: GpsFix, sessionStart: Long) {
+        context.settingsStore.edit {
+            if (it[SESSION_START] == sessionStart && it[SESSION_LAT] == null) it.writeFix(fix)
+        }
     }
 
     suspend fun endCameraSession() {

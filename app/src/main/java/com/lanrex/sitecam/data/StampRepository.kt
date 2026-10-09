@@ -26,7 +26,10 @@ class StampRepository(
 
     /** Queues a MediaStore photo/video. The same file is never stamped twice. */
     suspend fun add(entry: MediaEntry, origin: ItemOrigin, startWork: Boolean = true): AddResult {
+        // Automatic scans never retry what failed or what the user chose to skip.
+        val automatic = origin == ItemOrigin.CAMERA_SESSION || origin == ItemOrigin.SITE_MODE
         val result = addInternal(
+            retryFailed = !automatic,
             sourceKey = entry.sourceKey,
             sourceUri = entry.uri.toString(),
             mediaStoreId = entry.id,
@@ -52,6 +55,7 @@ class StampRepository(
         sizeBytes: Long,
     ): AddResult {
         val result = addInternal(
+            retryFailed = true,
             sourceKey = sourceKey,
             sourceUri = sourceUri,
             mediaStoreId = null,
@@ -68,6 +72,7 @@ class StampRepository(
     }
 
     private suspend fun addInternal(
+        retryFailed: Boolean,
         sourceKey: String,
         sourceUri: String,
         mediaStoreId: Long?,
@@ -85,9 +90,11 @@ class StampRepository(
             return when (existing.status) {
                 ItemStatus.DONE -> AddResult.ALREADY_STAMPED
                 ItemStatus.QUEUED, ItemStatus.PROCESSING, ItemStatus.NEEDS_LOCATION -> AddResult.ALREADY_QUEUED
-                ItemStatus.FAILED, ItemStatus.SKIPPED -> {
+                ItemStatus.FAILED, ItemStatus.SKIPPED -> if (retryFailed) {
                     dao.update(existing.copy(status = ItemStatus.QUEUED, attempts = 0, message = null, updatedAt = now))
                     AddResult.RETRYING
+                } else {
+                    AddResult.ALREADY_QUEUED
                 }
             }
         }
@@ -157,4 +164,14 @@ class StampRepository(
     suspend fun remove(id: Long) {
         dao.delete(id)
     }
+
+    /** True when this file is already in SiteCam's list (stamped, queued, skipped or failed). */
+    suspend fun isKnown(sourceKey: String): Boolean = dao.findByKey(sourceKey) != null
+
+    /** Camera direction recorded by SiteCam's compass while the camera was open. */
+    suspend fun setHeading(sourceKey: String, headingDegrees: Float) {
+        dao.setHeading(sourceKey, headingDegrees)
+    }
+
+    fun siteModeDoneSince(since: Long): Flow<Int> = dao.siteModeDoneSince(since)
 }

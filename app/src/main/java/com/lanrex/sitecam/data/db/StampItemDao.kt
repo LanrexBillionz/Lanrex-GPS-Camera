@@ -69,4 +69,10 @@ interface StampItemDao {
 
     @Query("DELETE FROM stamp_items WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("UPDATE stamp_items SET headingDegrees = :heading WHERE sourceKey = :key AND headingDegrees IS NULL")
+    suspend fun setHeading(key: String, heading: Float)
+
+    @Query("SELECT COUNT(*) FROM stamp_items WHERE status = 'DONE' AND origin = 'SITE_MODE' AND createdAt >= :since")
+    fun siteModeDoneSince(since: Long): Flow<Int>
 }
