@@ -9,6 +9,7 @@ import com.lanrex.sitecam.media.MediaEntry
 import com.lanrex.sitecam.media.MediaTypes
 import com.lanrex.sitecam.work.WorkScheduler
 import kotlinx.coroutines.flow.Flow
+import java.io.File
 
 /** Adds photos/videos to the stamping queue and applies the user's choices. */
 class StampRepository(
@@ -162,6 +163,8 @@ class StampRepository(
     }
 
     suspend fun remove(id: Long) {
+        // A private copy of a shared file is no longer needed once the item is gone.
+        dao.get(id)?.localCopyPath?.let { File(it).delete() }
         dao.delete(id)
     }
 

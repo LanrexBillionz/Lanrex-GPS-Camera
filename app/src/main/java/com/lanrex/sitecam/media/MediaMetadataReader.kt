@@ -46,6 +46,7 @@ data class VideoInfo(
     val videoBitrate: Int?,
     val frameRate: Float?,
     val isHdr: Boolean,
+    val hasAudio: Boolean,
 ) {
     val hasLocation: Boolean get() = CoordinateFormat.isValid(latitude, longitude)
     val displayWidth: Int get() = if (rotationDegrees % 180 == 0) width else height
@@ -187,6 +188,7 @@ class MediaMetadataReader(private val context: Context) {
         var bitrate: Int? = null
         var frameRate: Float? = null
         var hdr = false
+        var hasAudio = false
         val extractor = MediaExtractor()
         try {
             context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
@@ -194,7 +196,8 @@ class MediaMetadataReader(private val context: Context) {
                 for (i in 0 until extractor.trackCount) {
                     val format = extractor.getTrackFormat(i)
                     val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                    if (!mime.startsWith("video/")) continue
+                    if (mime.startsWith("audio/")) hasAudio = true
+                    if (!mime.startsWith("video/") || videoMime != null) continue
                     videoMime = mime
                     if (format.containsKey(MediaFormat.KEY_BIT_RATE)) bitrate = format.getInteger(MediaFormat.KEY_BIT_RATE)
                     if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
@@ -208,11 +211,11 @@ class MediaMetadataReader(private val context: Context) {
                         val transfer = format.getInteger(MediaFormat.KEY_COLOR_TRANSFER)
                         hdr = transfer == MediaFormat.COLOR_TRANSFER_ST2084 || transfer == MediaFormat.COLOR_TRANSFER_HLG
                     }
-                    break
                 }
             }
         } catch (e: Exception) {
-            // Track details are optional; Transformer works without them.
+            // Track details are optional; Transformer works without them. Assume the usual audio track.
+            hasAudio = true
         } finally {
             extractor.release()
         }
@@ -232,6 +235,7 @@ class MediaMetadataReader(private val context: Context) {
             videoBitrate = bitrate,
             frameRate = frameRate,
             isHdr = hdr,
+            hasAudio = hasAudio,
         )
     }
 

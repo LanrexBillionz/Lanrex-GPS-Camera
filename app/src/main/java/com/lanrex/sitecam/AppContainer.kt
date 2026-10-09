@@ -19,6 +19,7 @@ import com.lanrex.sitecam.stamp.MapTileProvider
 import com.lanrex.sitecam.stamp.PhotoStamper
 import com.lanrex.sitecam.stamp.StampProcessor
 import com.lanrex.sitecam.stamp.StampRenderer
+import com.lanrex.sitecam.stamp.VideoStamper
 import com.lanrex.sitecam.work.Notifier
 import com.lanrex.sitecam.work.WorkScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -64,6 +65,8 @@ class AppContainer(val app: Application) {
             mediaWriter = mediaWriter,
             notifier = notifier,
             heading = headingRecorder,
+            videoStamper = VideoStamper(app, stampRenderer),
+            onRestampNeeded = { workScheduler.scheduleRestamp() },
         )
     }
 
@@ -87,8 +90,12 @@ class AppContainer(val app: Application) {
         notifier.createChannels()
         appScope.launch {
             mapTileProvider.trimCache()
+            // Videos put aside before video stamping existed are stamped now.
+            database.stampItems().requeueWaitingVideos(System.currentTimeMillis())
             // Anything left in the queue (e.g. the phone restarted mid-way) continues.
             if (stampProcessor.hasWork()) workScheduler.startStamping()
+            // Copies stamped offline get their address once the phone is online.
+            if (stampProcessor.pendingRestampCount() > 0) workScheduler.scheduleRestamp()
         }
     }
 }

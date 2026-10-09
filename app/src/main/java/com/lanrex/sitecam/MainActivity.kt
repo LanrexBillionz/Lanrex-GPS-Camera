@@ -27,6 +27,7 @@ import com.lanrex.sitecam.ui.queue.QueueViewModel
 import com.lanrex.sitecam.ui.settings.SettingsScreen
 import com.lanrex.sitecam.ui.settings.SettingsViewModel
 import com.lanrex.sitecam.ui.theme.SiteCamTheme
+import com.lanrex.sitecam.util.Network
 import com.lanrex.sitecam.work.Notifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -58,6 +59,10 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this@MainActivity, "Found $what from the camera. Stamping now.", Toast.LENGTH_LONG).show()
             }
             container.siteModeController.ensureRunning()
+            // Copies stamped offline: add their address now if the phone is online.
+            if (Network.isOnline(this@MainActivity) && container.stampProcessor.pendingRestampCount() > 0) {
+                container.workScheduler.restampNow()
+            }
         }
     }
 

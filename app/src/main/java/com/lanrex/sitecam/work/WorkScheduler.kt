@@ -2,9 +2,11 @@ package com.lanrex.sitecam.work
 
 import android.content.Context
 import android.provider.MediaStore
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -23,6 +25,28 @@ class WorkScheduler(private val context: Context) {
             .addTag(TAG_STAMPING)
             .build()
         workManager.enqueueUniqueWork(UNIQUE_STAMPING, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+    }
+
+    /**
+     * Copies stamped without internet are stamped again (from the original) as
+     * soon as the phone is online, retrying with growing gaps if lookups still fail.
+     */
+    fun scheduleRestamp() {
+        val request = OneTimeWorkRequestBuilder<RestampWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, Duration.ofMinutes(10))
+            .addTag(TAG_RESTAMP)
+            .build()
+        workManager.enqueueUniqueWork(UNIQUE_RESTAMP, ExistingWorkPolicy.KEEP, request)
+    }
+
+    /** SiteCam was opened while online: don't wait for the next scheduled retry. */
+    fun restampNow() {
+        val request = OneTimeWorkRequestBuilder<RestampWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .addTag(TAG_RESTAMP)
+            .build()
+        workManager.enqueueUniqueWork(UNIQUE_RESTAMP_NOW, ExistingWorkPolicy.KEEP, request)
     }
 
     /** Site Mode backups: a MediaStore-triggered job and a 15-minute safety check. */
@@ -61,6 +85,9 @@ class WorkScheduler(private val context: Context) {
         const val UNIQUE_STAMPING = "stamp-queue"
         const val UNIQUE_SITE_TRIGGER = "site-mode-trigger"
         const val UNIQUE_SITE_PERIODIC = "site-mode-periodic"
+        const val UNIQUE_RESTAMP = "restamp"
+        const val UNIQUE_RESTAMP_NOW = "restamp-now"
+        const val TAG_RESTAMP = "restamp"
         const val TAG_STAMPING = "stamping"
         const val TAG_SITE_MODE = "site-mode"
         const val KEY_CONTENT_TRIGGER = "content_trigger"

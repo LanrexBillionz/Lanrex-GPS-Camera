@@ -53,8 +53,14 @@ position saved inside it.
   notification shows while it is on, with a **Turn off Site Mode** button. Set battery usage to
   **Unrestricted** when asked, or Samsung may pause it.
 - **Older photos**: tap **Gallery** and pick them, or select them in Samsung Gallery and **Share → SiteCam**.
-- Stamped copies are saved in **Pictures/SiteCam** as `name_stamped.jpg`. The original stays as it was.
-- Video stamping arrives with stage 4 below; until then videos wait in the list with a note.
+- Stamped copies are saved in **Pictures/SiteCam** as `name_stamped.jpg` (photos) or
+  `name_stamped.mp4` (videos). The original stays exactly as it was.
+- **Videos** get the same stamp burned in, at the same resolution and frame rate, with the sound
+  copied unchanged and about the same quality. Long videos take a while; progress shows in the app
+  and in the notification. HDR videos stay HDR when the phone can edit them.
+- **No internet?** Photos and videos are still stamped with the coordinates and time, and show
+  *Address pending* in the app. When the phone is back online SiteCam stamps them again from the
+  original, this time with the address and map, and replaces the earlier copy automatically.
 
 ## How the app is built
 
@@ -72,4 +78,4 @@ repository's own Releases page.
 1. ✅ Project, GitHub build, home screen with live location
 2. ✅ Stamping engine and gallery stamping
 3. ✅ Open Camera, auto-detect and Site Mode
-4. Offline handling and video stamping
+4. ✅ Offline handling and video stamping

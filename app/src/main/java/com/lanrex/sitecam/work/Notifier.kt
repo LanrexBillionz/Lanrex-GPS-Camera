@@ -65,6 +65,11 @@ class Notifier(private val context: Context) {
         post(ID_STAMPING, stampingNotification(title, text, percent))
     }
 
+    /** Same progress notification, under another id (e.g. re-stamping after going online). */
+    fun updateStampingWithId(id: Int, title: String, text: String?, percent: Int?) {
+        post(id, stampingNotification(title, text, percent))
+    }
+
     fun needsLocation(count: Int) {
         if (count <= 0) {
             cancel(ID_NEEDS_LOCATION)

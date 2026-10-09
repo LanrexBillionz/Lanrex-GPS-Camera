@@ -61,6 +61,16 @@ interface StampItemDao {
     @Query("SELECT COUNT(*) FROM stamp_items WHERE status = 'DONE' AND (addressPending = 1 OR mapPending = 1)")
     fun pendingRestampCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM stamp_items WHERE status = 'DONE' AND (addressPending = 1 OR mapPending = 1)")
+    suspend fun pendingRestampCountNow(): Int
+
+    /** Videos put aside by earlier versions (before video stamping existed) go back in the queue. */
+    @Query(
+        "UPDATE stamp_items SET status = 'QUEUED', attempts = 0, message = NULL, updatedAt = :now " +
+            "WHERE status = 'SKIPPED' AND isVideo = 1 AND message LIKE 'Video stamping arrives%'",
+    )
+    suspend fun requeueWaitingVideos(now: Long): Int
+
     @Query("SELECT mediaStoreId FROM stamp_items WHERE mediaStoreId IS NOT NULL AND status = 'DONE'")
     fun stampedMediaIds(): Flow<List<Long>>
 
