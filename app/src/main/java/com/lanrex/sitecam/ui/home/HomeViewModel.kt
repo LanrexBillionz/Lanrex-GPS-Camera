@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lanrex.sitecam.AppContainer
 import com.lanrex.sitecam.core.format.CoordinateFormat
+import com.lanrex.sitecam.data.db.StampItem
 import com.lanrex.sitecam.location.AddressLookup
 import com.lanrex.sitecam.location.GpsFix
+import com.lanrex.sitecam.stamp.StampProgress
 import com.lanrex.sitecam.ui.permissions.AppPermissions
 import com.lanrex.sitecam.ui.permissions.PermissionSnapshot
 import kotlinx.coroutines.delay
@@ -58,6 +60,20 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     /** Address for the current position, looked up again after moving ~15 m. */
     val address: StateFlow<AddressUi> = addressFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AddressUi.Idle)
+
+    val recent: StateFlow<List<StampItem>> = container.stampRepository.recentDone
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val activeCount: StateFlow<Int> = container.stampRepository.active.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val needsLocationCount: StateFlow<Int> = container.stampRepository.needsLocation.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val problemCount: StateFlow<Int> = container.stampRepository.problems.map { list -> list.count { it.message != null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    val progress: StateFlow<StampProgress?> = container.stampProcessor.progress
 
     private fun addressFlow(): Flow<AddressUi> = fix
         .filterNotNull()
