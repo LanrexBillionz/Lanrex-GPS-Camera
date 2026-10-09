@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: white camera with a pin cut-out (status icons must be single-colour). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M5,6 L8,6 L9.5,4 L14.5,4 L16,6 L19,6 Q21,6 21,8 L21,18 Q21,20 19,20 L5,20 Q3,20 3,18 L3,8 Q3,6 5,6 Z M12,18 C11,16 8.5,14.5 8.5,12 A3.5,3.5 0,1 1,15.5 12 C15.5,14.5 13,16 12,18 Z" />
+</vector>

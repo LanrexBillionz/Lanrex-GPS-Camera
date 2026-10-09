@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small app logo drawn in the "SiteCam" tab of every stamp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#E65100"
+        android:pathData="M10,0 L38,0 Q48,0 48,10 L48,38 Q48,48 38,48 L10,48 Q0,48 0,38 L0,10 Q0,0 10,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13,14 L18,14 L20,10.5 L28,10.5 L30,14 L35,14 Q39,14 39,18 L39,34 Q39,38 35,38 L13,38 Q9,38 9,34 L9,18 Q9,14 13,14 Z" />
+    <path
+        android:fillColor="#E65100"
+        android:pathData="M24,35 C22,31 18.5,28.5 18.5,24.5 A5.5,5.5 0,1 1,29.5 24.5 C29.5,28.5 26,31 24,35 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,24.5 A2,2 0,1 0,26 24.5 A2,2 0,1 0,22 24.5 Z" />
+</vector>
